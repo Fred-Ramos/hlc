@@ -1,0 +1,6 @@
+[submodule "modules/iso15118"]
+	path = modules/iso15118
+	url = https://github.com/Fred-Ramos/iso15118_evse.git
+[submodule "modules/pyslac"]
+	path = modules/pyslac
+	url = https://github.com/Fred-Ramos/pyslac_evse.git
