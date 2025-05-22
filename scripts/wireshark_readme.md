@@ -1,10 +1,7 @@
-# Wireshark QCA packets capture
-On the EVSE run the installation:
+To install requirements on EVSE (here) run:
 
 ```
-sudo apt update
-sudo apt install tcpdump -y
-sudo apt install netcat-traditional -y
+./wireshark_setup.sh
 ```
 
 On chosen `COMPUTER`, which must have wireshark and netcat installed, run the command:
@@ -13,13 +10,14 @@ On chosen `COMPUTER`, which must have wireshark and netcat installed, run the co
 nc -l -p 15200 | wireshark -k -i -
 ```
 
-Or using dumpcap
+Or using dumpcap:
+
 ```
 nc -l -p 15200 | dumpcap -i - -w capture.pcap
 ```
 
 And then run command on the EVSE:
 
-```
-sudo tcpdump -i eth1 -s 0 -U -w - | nc ISO_OPERATOR_IP 15200
+```bash
+./wireshark_tcp_dump.sh
 ```

@@ -208,7 +208,6 @@ class ISO15118_Handler(IEC61851_Handler, EVSEControllerInterface): #EVSEControll
             the SECC (Supply Equipment Communication Controller)
             """
             logger.info("Starting (INESCTEC Modified) EcoG-io's EVSEController")
-            self.ev_data_context = EVDataContext()
             self.evse_data_context = get_evse_context()
 
             self.iso_config = Config()

@@ -85,7 +85,7 @@ class SlacHandler(SlacSessionController):
                     self.level_communication = LLC_COM #Will atempt basic charging (using LLC)
                 else:
                     raise Exception(
-                        f"UNDEFINED SLAC HANDLING BEHAVIOUR. "
+                        f"UNDEFINED SLAC HANDLING BEHAVIOUR."
                         f"Committed State: {cp_controller.committed_state}, "
                         f"Charge Mode: {cp_controller.charge_mode}",
                         f"HLC charging: {cp_controller.hlc_charging}"
