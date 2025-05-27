@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 from pyslac.session import SlacEvseSession, SlacSessionController
 
 from pyslac.enums import (
+    C_SEQU_RETRY_TIMES,
     CM_ATTEN_CHAR,
     CM_ATTEN_PROFILE,
     CM_MNBC_SOUND,
@@ -39,8 +40,6 @@ from pyslac.enums import (
     Timers,
 )
 
-C_SEQU_RETRY_TIMES = 3
-
 class SlacHandler(SlacSessionController):
     slac_running_session: SlacEvseSession #slac evse session class
     level_communication: int #-1 for not defined yet, 0 for llc, 1 for hlc
@@ -49,6 +48,7 @@ class SlacHandler(SlacSessionController):
     def __init__(self, evse_id):
         super().__init__() #calls parent's classes initialization
         self.level_communication = -1 #Communication Level starts undefined
+        self.max_slac_retry_times = int(os.getenv("MAX_SLAC_RETRY_TIMES", str(C_SEQU_RETRY_TIMES)))
         self.slac_attempt = 0 #no attempt yet
         self.evse_id = evse_id
 
@@ -68,21 +68,23 @@ class SlacHandler(SlacSessionController):
                     asyncio.sleep(0.1) #wait to make sure routine triggers
                     await self.slac_running_session.evse_set_key() #set SLAC key, it wasnt set yet
                     return
-                elif cp_controller.hlc_charging == 1 and self.slac_attempt < C_SEQU_RETRY_TIMES+1: #allow 5% dutycycle for HLC communication, when in state B, C or D || 1st atempt + 3 retries=4atempts
-                    logger.debug("PWM already 5% DutyCycle")
-                    #implement slac message
-                    self.slac_attempt+=1
-                    logger.debug(f"SLAC Attempt number {self.slac_attempt}")
-                    self.level_communication = await self.process_cp_state(self.slac_running_session, cp_controller.committed_state)
-                    if self.level_communication == HLC_NO_LINK: #if HLC failed, go to E state for SLAC_E_F_TIMEOUT time
-                        logger.debug("CHANGING TO -12 V")
-                        cp_controller.force_F = 1 #force state F
-                        await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
-                        logger.debug("CHANGING BACK TO 12 V")
-                        cp_controller.force_F = 0 #leave state F
-                elif cp_controller.hlc_charging == 1 and self.slac_attempt > C_SEQU_RETRY_TIMES:
-                    logger.debug("PEV-EVSE MATCHED Failed: No more retries " "possible")
-                    self.level_communication = LLC_COM #Will atempt basic charging (using LLC)
+                elif cp_controller.hlc_charging == 1:
+                    if self.slac_attempt <= self.max_slac_retry_times: #allow 5% dutycycle for HLC communication, when in state B, C or D || 1st atempt + 3 retries=4atempts
+                        logger.debug("PWM already 5% DutyCycle")
+                        #implement slac message
+                        self.slac_attempt+=1
+                        logger.debug(f"SLAC Attempt number {self.slac_attempt}")
+                        self.level_communication = await self.process_cp_state(self.slac_running_session, cp_controller.committed_state)
+                        if self.level_communication == HLC_NO_LINK: #if HLC failed, go to E state for SLAC_E_F_TIMEOUT time
+                            logger.debug("CHANGING TO -12 V")
+                            cp_controller.force_F = 1 #force state F
+                            await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
+                            logger.debug("CHANGING BACK TO 12 V")
+                            cp_controller.force_F = 0 #leave state F
+
+                    else:
+                        logger.debug("PEV-EVSE MATCHED Failed: No more retries " "possible")
+                        self.level_communication = LLC_COM #Will atempt basic charging (using LLC)
                 else:
                     raise Exception(
                         f"UNDEFINED SLAC HANDLING BEHAVIOUR."

@@ -45,23 +45,23 @@ if [[ "$ISO_VERSION" == "2" ]]; then
 
     # **ISO 15118-2 Certificates**
     CERT_MAP=(
-        ["contractCert.pem"]="contractLeafCert.pem"
-        ["moSubCA2.pem"]="moSubCA2Cert.pem"
-        ["moSubCA1.pem"]="moSubCA1Cert.pem"
-        ["moRootCA.pem"]="moRootCACert.pem"
-        ["seccCert.pem"]="seccLeafCert.pem"
-        ["cpoSubCA2.pem"]="cpoSubCA2Cert.pem"
-        ["cpoSubCA1.pem"]="cpoSubCA1Cert.pem"
-        ["v2gRootCA.pem"]="v2gRootCACert.pem"
+        ["contractCert.pem"]="contractLeaf.pem"
+        ["moSubCA2.pem"]="moSubCA2.pem"
+        ["moSubCA1.pem"]="moSubCA1.pem"
+        ["moRootCA.pem"]="moRootCA.pem"
+        ["seccCert.pem"]="seccLeaf.pem"
+        ["cpoSubCA2.pem"]="cpoSubCA2.pem"
+        ["cpoSubCA1.pem"]="cpoSubCA1.pem"
+        ["v2gRootCA.pem"]="v2gRootCA.pem"
     )
 
     # **ISO 15118-2 CSRs**
     CSR_MAP=(
-        ["contractCert.csr"]="contractLeafCert.csr"
+        ["contractCert.csr"]="contractLeaf.csr"
         ["moSubCA2.csr"]="moSubCA2.csr"
         ["moSubCA1.csr"]="moSubCA1.csr"
         ["moRootCA.csr"]="moRootCA.csr"
-        ["seccCert.csr"]="seccLeafCert.csr"
+        ["seccCert.csr"]="seccLeaf.csr"
         ["cpoSubCA2.csr"]="cpoSubCA2.csr"
         ["cpoSubCA1.csr"]="cpoSubCA1.csr"
         ["v2gRootCA.csr"]="v2gRootCA.csr"
@@ -76,10 +76,6 @@ else
         ["moSubCA2.key"]="moSubCA2.key"
         ["moSubCA1.key"]="moSubCA1.key"
         ["moRootCA.key"]="moRootCA.key"
-        ["secc20Cert.key"]="seccLeaf.key" 
-        ["cpo20SubCA2.key"]="cpoSubCA2.key" 
-        ["cpo20SubCA1.key"]="cpoSubCA1.key" 
-        ["v2g20RootCA.key"]="v2gRootCA.key" 
         ["cpsLeafCert.key"]="cpsLeaf.key"
         ["cpsSubCA2.key"]="cpsSubCA2.key"
         ["cpsSubCA1.key"]="cpsSubCA1.key"
@@ -87,41 +83,51 @@ else
         ["oemSubCA2.key"]="oemSubCA2.key"
         ["oemSubCA1.key"]="oemSubCA1.key"
         ["oemRootCA.key"]="oemRootCA.key"
+        ["secc20Cert.key"]="seccLeaf.key" 
+        ["cpo20SubCA2.key"]="cpoSubCA2.key" 
+        ["cpo20SubCA1.key"]="cpoSubCA1.key" 
+        ["vehicle20Cert.key"]="vehicleLeaf.key"
+        ["vehicle20SubCA2.key"]="vehicleSubCA2.key"
+        ["vehicle20SubCA1.key"]="vehicleSubCA1.key"
+        ["v2g20RootCA.key"]="v2gRootCA.key" 
     )
 
     # **ISO 15118-20 Certificates**
     CERT_MAP=(
-        ["contractCert.pem"]="contractLeafCert.pem"
-        ["moSubCA2.pem"]="moSubCA2Cert.pem"
-        ["moSubCA1.pem"]="moSubCA1Cert.pem"
-        ["moRootCA.pem"]="moRootCACert.pem"
-        ["secc20Cert.pem"]="seccLeafCert.pem" 
-        ["cpo20SubCA2.pem"]="cpoSubCA2Cert.pem"
-        ["cpo20SubCA1.pem"]="cpoSubCA1Cert.pem" 
-        ["v2g20RootCA.pem"]="v2gRootCACert.pem" 
-        ["cpsLeafCert.pem"]="cpsLeafCert.pem"
-        ["cpsSubCA2.pem"]="cpsSubCA2Cert.pem"
-        ["cpsSubCA1.pem"]="cpsSubCA1Cert.pem"
-        ["oemProvCert.pem"]="oemLeafCert.pem"
-        ["oemSubCA2.pem"]="oemSubCA2Cert.pem"
-        ["oemSubCA1.pem"]="oemSubCA1Cert.pem"
-        ["oemRootCA.pem"]="oemRootCACert.pem"
+        ["contractCert.pem"]="contractLeaf.pem"
+        ["moSubCA2.pem"]="moSubCA2.pem"
+        ["moSubCA1.pem"]="moSubCA1.pem"
+        ["moRootCA.pem"]="moRootCA.pem"
+        ["cpsLeafCert.pem"]="cpsLeaf.pem"
+        ["cpsSubCA2.pem"]="cpsSubCA2.pem"
+        ["cpsSubCA1.pem"]="cpsSubCA1.pem"
+        ["oemProvCert.pem"]="oemLeaf.pem"
+        ["oemSubCA2.pem"]="oemSubCA2.pem"
+        ["oemSubCA1.pem"]="oemSubCA1.pem"
+        ["oemRootCA.pem"]="oemRootCA.pem"
+        ["secc20Cert.pem"]="seccLeaf.pem" 
+        ["cpo20SubCA2.pem"]="cpoSubCA2.pem"
+        ["cpo20SubCA1.pem"]="cpoSubCA1.pem" 
+        ["vehicle20Cert.pem"]="vehicleLeaf.pem"
+        ["vehicle20SubCA2.pem"]="vehicleSubCA2.pem"
+        ["vehicle20SubCA1.pem"]="vehicleSubCA1.pem"
+        ["v2g20RootCA.pem"]="v2gRootCA.pem" 
     )
 
     # **ISO 15118-20 CSRs**
     CSR_MAP=(
-        ["contractCert.csr"]="contractLeafCert.csr"
+        ["contractCert.csr"]="contractLeaf.csr"
         ["moSubCA2.csr"]="moSubCA2.csr"
         ["moSubCA1.csr"]="moSubCA1.csr"
         ["moRootCA.csr"]="moRootCA.csr"
-        ["seccCert.csr"]="seccLeafCert.csr"
+        ["seccCert.csr"]="seccLeaf.csr"
         ["cpoSubCA2.csr"]="cpoSubCA2.csr"
         ["cpoSubCA1.csr"]="cpoSubCA1.csr"
         ["v2gRootCA.csr"]="v2gRootCA.csr"
-        ["cpsLeafCert.csr"]="cpsLeafCert.csr"
+        ["cpsLeafCert.csr"]="cpsLeaf.csr"
         ["cpsSubCA2.csr"]="cpsSubCA2.csr"
         ["cpsSubCA1.csr"]="cpsSubCA1.csr"
-        ["oemProvCert.csr"]="oemLeafCert.csr"
+        ["oemProvCert.csr"]="oemLeaf.csr"
         ["oemSubCA2.csr"]="oemSubCA2.csr"
         ["oemSubCA1.csr"]="oemSubCA1.csr"
         ["oemRootCA.csr"]="oemRootCA.csr"
@@ -156,15 +162,21 @@ for csr in "${!CSR_MAP[@]}"; do
 done
 
 # Generate cpoCertChain.pem
-if [[ -f "$DEST_DIR/certs/seccLeafCert.pem" && -f "$DEST_DIR/certs/cpoSubCA2Cert.pem" && -f "$DEST_DIR/certs/cpoSubCA1Cert.pem" ]]; then
+if [[ -f "$DEST_DIR/certs/seccLeaf.pem" && -f "$DEST_DIR/certs/cpoSubCA2.pem" && -f "$DEST_DIR/certs/cpoSubCA1.pem" ]]; then
     echo "Generating cpoCertChain.pem..."
-    cat "$DEST_DIR/certs/seccLeafCert.pem" "$DEST_DIR/certs/cpoSubCA2Cert.pem" "$DEST_DIR/certs/cpoSubCA1Cert.pem" > "$DEST_DIR/certs/cpoCertChain.pem"
+    cat "$DEST_DIR/certs/seccLeaf.pem" "$DEST_DIR/certs/cpoSubCA2.pem" "$DEST_DIR/certs/cpoSubCA1.pem" > "$DEST_DIR/certs/cpoCertChain.pem"
 fi
 
 # Generate oemCertChain.pem
-if [[ -f "$DEST_DIR/certs/oemLeafCert.pem" && -f "$DEST_DIR/certs/oemSubCA2Cert.pem" && -f "$DEST_DIR/certs/oemSubCA1Cert.pem" ]]; then
+if [[ -f "$DEST_DIR/certs/oemLeaf.pem" && -f "$DEST_DIR/certs/oemSubCA2.pem" && -f "$DEST_DIR/certs/oemSubCA1.pem" ]]; then
     echo "Generating oemCertChain.pem..."
-    cat "$DEST_DIR/certs/oemLeafCert.pem" "$DEST_DIR/certs/oemSubCA2Cert.pem" "$DEST_DIR/certs/oemSubCA1Cert.pem" > "$DEST_DIR/certs/oemCertChain.pem"
+    cat "$DEST_DIR/certs/oemLeaf.pem" "$DEST_DIR/certs/oemSubCA2.pem" "$DEST_DIR/certs/oemSubCA1.pem" > "$DEST_DIR/certs/oemCertChain.pem"
+fi
+
+# Generate vehicleCertChain.pem
+if [[ -f "$DEST_DIR/certs/vehicleLeaf.pem" && -f "$DEST_DIR/certs/vehicleSubCA2.pem" && -f "$DEST_DIR/certs/vehicleSubCA1.pem" ]]; then
+    echo "Generating vehicleCertChain.pem..."
+    cat "$DEST_DIR/certs/vehicleLeaf.pem" "$DEST_DIR/certs/vehicleSubCA2.pem" "$DEST_DIR/certs/vehicleSubCA1.pem" > "$DEST_DIR/certs/vehicleCertChain.pem"
 fi
 
 # Generate missing password .txt files using passphrase.txt
@@ -179,6 +191,7 @@ if [ -f "$PASSPHRASE_FILE" ]; then
         "moSubCA2LeafPassword.txt"
         "oemLeafPassword.txt"
         "seccLeafPassword.txt"
+        "vehicleLeafPassword.txt"
     )
 
     for password_file in "${PASSWORD_FILES[@]}"; do
