@@ -9,9 +9,9 @@ from evse.iec61851 import IEC61851_Handler
 from evse.hlc.slac_handler import SlacHandler
 
 from pyslac.enums import (
-    HLC_SUCESS,
-    LLC_COM,
-    HLC_NO_LINK)
+    COMMUNICATION_HLC,
+    COMMUNICATION_LLC,
+    COMMUNICATION_NONE)
 
 ###################################################### Logs ##########################################################################################################################
 import logging
@@ -231,21 +231,24 @@ class ISO15118_Handler(IEC61851_Handler, EVSEControllerInterface): #EVSEControll
     async def track_hlc_connection(self):
         while True:
             try:
-                if self.slac_handler.level_communication == HLC_NO_LINK:  # SLAC not determined yet
+                # No Communication type determined yet
+                if self.slac_handler.level_communication == COMMUNICATION_NONE:  # SLAC not determined yet
                     if self.cp_state.present[0] == "B":  # Car plugged
                         logger.debug("STARTING SLAC HANDLING")
                         await self.slac_handler.handling(self.basicCharging)  
-                elif self.slac_handler.level_communication != HLC_NO_LINK and self.cp_state.present[0] == 'A':   # Car unplugged and SLAC not reset yet
-                    logger.debug("RESETTING SLAC PARAMETERS AFTER UNPLUG")
-                    await self.reset_hlc()
-                    
-                    #close iso15118 module session, ver isto melhor depois
-                    if self.secc_handler.tcp_server_handler:
-                        try:
-                            logger.debug("Making sure existing tcp server handler is terminated duo to EV Unplug")
-                            await cancel_task(self.secc_handler.tcp_server_handler)
-                        except Exception as e:
-                            logger.warning(f"Error cancelling existing tcp server handler directly from EVSE: {e}")
+                
+                else:
+                    if self.cp_state.present[0] == 'A':  # Car unplugged and SLAC not reset yet
+                        logger.debug("RESETTING SLAC PARAMETERS AFTER UNPLUG")
+                        await self.reset_hlc()
+                        
+                        #close iso15118 module session, ver isto melhor depois
+                        if self.secc_handler.tcp_server_handler:
+                            try:
+                                logger.debug("Making sure existing tcp server handler is terminated duo to EV Unplug")
+                                await cancel_task(self.secc_handler.tcp_server_handler)
+                            except Exception as e:
+                                logger.warning(f"Error cancelling existing tcp server handler directly from EVSE: {e}")
 
                 await asyncio.sleep(0.1)
             except Exception as e:
@@ -255,7 +258,7 @@ class ISO15118_Handler(IEC61851_Handler, EVSEControllerInterface): #EVSEControll
         try:
             logger.info("Reseting SLAC values")
             self.slac_handler.slac_running_session.reset()   # Reset slac session
-            self.slac_handler.level_communication = HLC_NO_LINK # Session finished, communication level defined as 'undetermined' for next session
+            self.slac_handler.level_communication = COMMUNICATION_NONE # Session finished, communication level defined as 'undetermined' for next session
             self.slac_handler.slac_attempt = 0 # Restart slac attempt counter
             self.basicCharging.charge_mode = 1 # Make sure charger is in stop mode
             self.basicCharging.hlc_charging = 0 # Deactivate hlc charging 
@@ -267,7 +270,7 @@ class ISO15118_Handler(IEC61851_Handler, EVSEControllerInterface): #EVSEControll
         try:
             logger.info("############################################################ STARTING EVSE TASKS ################################################################")
             await self.set_status(ServiceStatus.STARTING)              # set ecogio status
-            routinesTask = asyncio.create_task(self.callAllRoutines()) # start routines as in IEC61851
+            routinesTask = asyncio.create_task(self.mainRoutines()) # start routines as in IEC61851
             slacProcessTask = asyncio.create_task(self.track_hlc_connection()) # start hlc routine
             seccHandlerTask = asyncio.create_task(self.secc_handler.start(self.iso_config.iface))  # SECC entry point
         except Exception as e:

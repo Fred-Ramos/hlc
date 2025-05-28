@@ -33,9 +33,9 @@ from pyslac.enums import (
     STATE_MATCHED,
     STATE_MATCHING,
     STATE_UNMATCHED,
-    HLC_SUCESS,
-    LLC_COM,
-    HLC_NO_LINK,
+    COMMUNICATION_HLC,
+    COMMUNICATION_LLC,
+    COMMUNICATION_NONE,
     FramesSizes,
     Timers,
 )
@@ -62,10 +62,10 @@ class SlacHandler(SlacSessionController):
     async def handling(self, cp_controller: BasicChargingStruct): #maybe enters session_handling_hlc
         try:
             if self.slac_running_session.state == STATE_UNMATCHED: #not matched and HLC not tried yet
-                if cp_controller.hlc_charging != HLC_SUCESS:
+                if cp_controller.hlc_charging != COMMUNICATION_HLC:
                     logger.debug("PLACING PWM INTO 5% DutyCycle")
                     cp_controller.hlc_charging = 1 #goes to state B2
-                    asyncio.sleep(0.1) #wait to make sure routine triggers
+                    await asyncio.sleep(0.1) #wait to make sure routine triggers
                     await self.slac_running_session.evse_set_key() #set SLAC key, it wasnt set yet
                     return
                 elif cp_controller.hlc_charging == 1:
@@ -75,16 +75,16 @@ class SlacHandler(SlacSessionController):
                         self.slac_attempt+=1
                         logger.debug(f"SLAC Attempt number {self.slac_attempt}")
                         self.level_communication = await self.process_cp_state(self.slac_running_session, cp_controller.committed_state)
-                        if self.level_communication == HLC_NO_LINK: #if HLC failed, go to E state for SLAC_E_F_TIMEOUT time
-                            logger.debug("CHANGING TO -12 V")
+                        if self.level_communication == COMMUNICATION_NONE: #if HLC failed, go to E state for SLAC_E_F_TIMEOUT time
+                            logger.debug("SLAC forced state F")
                             cp_controller.force_F = 1 #force state F
                             await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
-                            logger.debug("CHANGING BACK TO 12 V")
+                            logger.debug("SLAC stopping forced state F")
                             cp_controller.force_F = 0 #leave state F
 
                     else:
                         logger.debug("PEV-EVSE MATCHED Failed: No more retries " "possible")
-                        self.level_communication = LLC_COM #Will atempt basic charging (using LLC)
+                        self.level_communication = COMMUNICATION_LLC #Will atempt basic charging (using LLC)
                 else:
                     raise Exception(
                         f"UNDEFINED SLAC HANDLING BEHAVIOUR."
