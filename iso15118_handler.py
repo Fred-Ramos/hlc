@@ -4,6 +4,7 @@ import os
 
 ############################################################################### IEC Charger Class #######################################################################################
 from evse.iec61851 import IEC61851_Handler
+from evse.iec61851.basic_charging.build_basic_charging import ChargeMode
 
 ############################################################################### SLAC ####################################################################################################
 from evse.hlc.slac_handler import SlacHandler
@@ -183,7 +184,7 @@ from iso15118.secc import SECCHandler
 from iso15118.secc.controller.interface import ServiceStatus
 from iso15118.secc.secc_settings import Config
 from iso15118.shared.exificient_exi_codec import ExificientEXICodec
-5
+
 from iso15118.shared.utils import cancel_task
 
 ##################################################################################################################################################################################################################
@@ -231,7 +232,7 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
             self.slac_handler.slac_running_session.reset()   # Reset slac session
             self.slac_handler.level_communication = COMMUNICATION_NONE # Session finished, communication level defined as 'undetermined' for next session
             self.slac_handler.slac_attempt = 0 # Restart slac attempt counter
-            self.basicCharging.charge_mode = 1 # Make sure charger is in stop mode
+            self.basicCharging.charge_mode = ChargeMode.DISABLED # Make sure charger is in stop mode
             self.basicCharging.hlc_charging = 0 # Deactivate hlc charging 
 
             # #close iso15118 module session, ver isto melhor depois
@@ -248,7 +249,7 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
     #overwrites IEC61851 run method
     async def run(self):
         try:
-            logger.info("############################################################ STARTING EVSE TASKS ################################################################")
+            logger.info("Starting iso handler run...")
             routinesTask = asyncio.create_task(self.mainRoutines())
             backgroundTask = asyncio.create_task(self.backgroundChecks())
             slacProcessTask = asyncio.create_task(self.track_hlc_connection()) # start hlc routine

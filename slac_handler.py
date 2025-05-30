@@ -48,8 +48,8 @@ class SlacHandler(SlacSessionController):
     def __init__(self, evse_id):
         super().__init__() #calls parent's classes initialization
         self.level_communication = -1 #Communication Level starts undefined
-        self.max_slac_retry_times = int(os.getenv("MAX_SLAC_RETRY_TIMES", str(C_SEQU_RETRY_TIMES)))
-        self.slac_attempt = 0 #no attempt yet
+        self.max_slac_attempts = 1 + int(os.getenv("MAX_SLAC_RETRY_TIMES", str(C_SEQU_RETRY_TIMES))) # 1 attempt + retries
+        self.slac_attempt = 0 # no attempt yet
         self.evse_id = evse_id
 
         hlc_network_interface: str = os.getenv("NETWORK_INTERFACE")
@@ -58,33 +58,35 @@ class SlacHandler(SlacSessionController):
         except (OSError, TimeoutError, ValueError) as e:
             logger.error(f"PLC chip initialization failed for interface {hlc_network_interface} \n")
             return        
-
+    
     async def handling(self, cp_controller: BasicChargingStruct): #maybe enters session_handling_hlc
         try:
             if self.slac_running_session.state == STATE_UNMATCHED: #not matched and HLC not tried yet
-                if cp_controller.hlc_charging != COMMUNICATION_HLC:
+                if not cp_controller.hlc_charging:
                     logger.debug("PLACING PWM INTO 5% DutyCycle")
-                    cp_controller.hlc_charging = 1 #goes to state B2
+                    cp_controller.hlc_charging = 1 # enable hlc charging in basiccharging module, 5% pwm
                     await asyncio.sleep(0.1) #wait to make sure routine triggers
                     await self.slac_running_session.evse_set_key() #set SLAC key, it wasnt set yet
                     return
-                elif cp_controller.hlc_charging == 1:
-                    if self.slac_attempt <= self.max_slac_retry_times: #allow 5% dutycycle for HLC communication, when in state B, C or D || 1st atempt + 3 retries=4atempts
+                elif cp_controller.hlc_charging: # if hlc_charging enabled in basic charging
+                    if self.slac_attempt < self.max_slac_attempts: #allow 5% dutycycle for HLC communication, when in state B, C or D || 1st atempt + 3 retries=4atempts
                         logger.debug("PWM already 5% DutyCycle")
                         #implement slac message
                         self.slac_attempt+=1
                         logger.debug(f"SLAC Attempt number {self.slac_attempt}")
                         self.level_communication = await self.process_cp_state(self.slac_running_session, cp_controller.committed_state)
-                        if self.level_communication == COMMUNICATION_NONE: #if HLC failed, go to E state for SLAC_E_F_TIMEOUT time
+                        if self.level_communication == COMMUNICATION_NONE: #if HLC failed, go to F state for SLAC_E_F_TIMEOUT time
                             logger.debug("SLAC forced state F")
                             cp_controller.force_F = 1 #force state F
                             await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
-                            logger.debug("SLAC stopping forced state F")
+                            if self.slac_attempt == self.max_slac_attempts: # if this was the last retry, disable hlc charging and resume LLC communication
+                                logger.debug("PEV-EVSE MATCHED Failed: No more retries possible; Resuming LLC Charging")
+                                cp_controller.hlc_charging = 0 # disable hlc charging
+                                self.level_communication = COMMUNICATION_LLC #Will atempt basic charging (using LLC)
+
+                            logger.debug("SLAC leaving forced state F")
                             cp_controller.force_F = 0 #leave state F
 
-                    else:
-                        logger.debug("PEV-EVSE MATCHED Failed: No more retries " "possible")
-                        self.level_communication = COMMUNICATION_LLC #Will atempt basic charging (using LLC)
                 else:
                     raise Exception(
                         f"UNDEFINED SLAC HANDLING BEHAVIOUR."
