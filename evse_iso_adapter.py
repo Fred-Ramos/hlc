@@ -6,7 +6,7 @@ import os
 from evse.iec61851 import IEC61851_Handler
 
 ############################################################################### SLAC ####################################################################################################
-from evse.hlc.slac_handler import SlacHandler
+from evse.hlc.slac_handler import Slac_Handler
 
 from pyslac.enums import (
     COMMUNICATION_HLC,
@@ -180,7 +180,7 @@ from iso15118.shared.settings import set_pki_protocol
 ##################################################################################################################################################################################################################
 class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from Ecog-io
     #======================== ISO Specific Variables =====================#
-    slac_handler: SlacHandler #Slac handler that will process all slac operations (made taking into account Ecog-io example)
+    slac_handler: Slac_Handler #Slac handler that will process all slac operations (made taking into account Ecog-io example)
     #============================ Class Functions ==========================#
     def __init__(self):
         try:
@@ -196,7 +196,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
             logger.info("Starting (INESCTEC Modified) EcoG-io's EVSEController")
             self.evse_data_context = get_evse_context()
 
-            logger.info("########################################### Finished ISO Charger structure initialization ###########################################")
+            logger.info("########## Finished EVSE ISO Adapter structure initialization ##########")
         except Exception as e:
             logger.error(e)
             exit(1)
@@ -743,7 +743,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         """Overrides EVSEControllerInterface.get_meter_info_v2()."""
         return MeterInfoV2(
             meter_id=self.meter_id, 
-            meter_reading=int(self.energyMeter.energy), 
+            meter_reading=int(self.controller.energyMeter.energy), 
             t_meter=time.time()  #substituir por em.energy depois
         )
 
@@ -751,7 +751,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         """Overrides EVSEControllerInterface.get_meter_info_v20()."""
         return MeterInfoV20(
             meter_id=self.meter_id,
-            charged_energy_reading_wh=int(self.energyMeter.energy),
+            charged_energy_reading_wh=int(self.controller.energyMeter.energy),
             meter_timestamp=time.time(),
         )
 
@@ -873,7 +873,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
             evse_nominal_frequency=RationalNumber.get_rational_repr(self.controller.nominalFrequency),
             max_power_asymmetry=RationalNumber.get_rational_repr(0),
             evse_power_ramp_limit=RationalNumber.get_rational_repr(100),
-            evse_present_active_power=RationalNumber.get_rational_repr(self.energyMeter.power),
+            evse_present_active_power=RationalNumber.get_rational_repr(self.controller.energyMeter.power),
             # evse_present_active_power_l2=RationalNumber.get_rational_repr(0),
             # evse_present_active_power_l3=RationalNumber.get_rational_repr(0),
         )
@@ -933,7 +933,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         return PVEVSEMaxVoltageLimit(multiplier=0, value=int(self.controller.nominalMaxPower*1.05), unit="V")
 
     async def get_evse_max_current_limit(self) -> PVEVSEMaxCurrentLimit:
-        present_max_current = int(self.controller.nominalMaxPower/self.energyMeter.voltage) #use the current value read by the energy meter in terms of voltage and determine max current
+        present_max_current = int(self.controller.nominalMaxPower/self.controller.energyMeter.voltage) #use the current value read by the energy meter in terms of voltage and determine max current
         return PVEVSEMaxCurrentLimit(multiplier=0, value=present_max_current, unit="A") #=33 Amps
 
     async def get_evse_max_power_limit(self) -> PVEVSEMaxPowerLimit:

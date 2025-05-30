@@ -40,7 +40,7 @@ from pyslac.enums import (
     Timers,
 )
 
-class SlacHandler(SlacSessionController):
+class Slac_Handler(SlacSessionController):
     slac_running_session: SlacEvseSession #slac evse session class
     level_communication: int #-1 for not defined yet, 0 for llc, 1 for hlc
     slac_attempt: int #current number of attempts at slac in this session, 1 attempt + 2 retry max
@@ -76,7 +76,7 @@ class SlacHandler(SlacSessionController):
                         logger.debug(f"SLAC Attempt number {self.slac_attempt}")
                         self.level_communication = await self.process_cp_state(self.slac_running_session, cp_controller.committed_state)
                         if self.level_communication == COMMUNICATION_NONE: #if HLC failed, go to F state for SLAC_E_F_TIMEOUT time
-                            logger.debug("SLAC forced state F")
+                            logger.debug("SLAC Entering T_STEP_EF")
                             cp_controller.force_F = 1 #force state F
                             await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
                             if self.slac_attempt == self.max_slac_attempts: # if this was the last retry, disable hlc charging and resume LLC communication
@@ -84,7 +84,7 @@ class SlacHandler(SlacSessionController):
                                 cp_controller.hlc_charging = 0 # disable hlc charging
                                 self.level_communication = COMMUNICATION_LLC #Will atempt basic charging (using LLC)
 
-                            logger.debug("SLAC leaving forced state F")
+                            logger.debug("SLAC EXITING T_STEP_EF")
                             cp_controller.force_F = 0 #leave state F
 
                 else:

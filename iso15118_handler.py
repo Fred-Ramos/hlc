@@ -7,7 +7,7 @@ from evse.iec61851 import IEC61851_Handler
 from evse.iec61851.basic_charging.build_basic_charging import ChargeMode
 
 ############################################################################### SLAC ####################################################################################################
-from evse.hlc.slac_handler import SlacHandler
+from evse.hlc.slac_handler import Slac_Handler
 
 from pyslac.enums import (
     COMMUNICATION_HLC,
@@ -190,7 +190,7 @@ from iso15118.shared.utils import cancel_task
 ##################################################################################################################################################################################################################
 class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
     #======================== ISO Specific Variables =====================#
-    slac_handler: SlacHandler #Slac handler that will process all slac operations (made taking into account Ecog-io example)
+    slac_handler: Slac_Handler #Slac handler that will process all slac operations (made taking into account Ecog-io example)
     secc_handler: SECCHandler #SECC handler control center that manages all hlc communication sessions (Ecog-io)
     #============================ Class Functions ==========================#
     def __init__(self, authentication_needed):
@@ -201,7 +201,7 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
             #======================================SLAC initialization====================================#
             self.evse_id = os.getenv("EVSE_ID")
             
-            self.slac_handler=SlacHandler(self.evse_id)
+            self.slac_handler=Slac_Handler(self.evse_id)
 
             logger.info("########################################### Finished ISO Handler initialization ###########################################")
         except Exception as e:
