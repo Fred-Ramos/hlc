@@ -11,7 +11,7 @@ from evse.hlc.slac_handler import Slac_Handler
 from pyslac.enums import (
     COMMUNICATION_HLC,
     COMMUNICATION_LLC,
-    COMMUNICATION_NONE)
+    COMMUNICATION_DETERMINING)
 
 ###################################################### Logs ##########################################################################################################################
 import logging

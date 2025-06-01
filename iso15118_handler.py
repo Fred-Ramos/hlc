@@ -10,9 +10,10 @@ from evse.iec61851.basic_charging.build_basic_charging import ChargeMode
 from evse.hlc.slac_handler import Slac_Handler
 
 from pyslac.enums import (
+    COMMUNICATION_UNDEFINED,
     COMMUNICATION_HLC,
     COMMUNICATION_LLC,
-    COMMUNICATION_NONE)
+    COMMUNICATION_DETERMINING)
 
 ###################################################### Logs ##########################################################################################################################
 import logging
@@ -201,39 +202,60 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
             #======================================SLAC initialization====================================#
             self.evse_id = os.getenv("EVSE_ID")
             
-            self.slac_handler=Slac_Handler(self.evse_id)
-
+            self.slac_handler = Slac_Handler(self.evse_id)
+            self.slac_handler_task = None
+            self.hlc_timer_task = None
             logger.info("########################################### Finished ISO Handler initialization ###########################################")
         except Exception as e:
             logger.error(e)
             exit(1)
 
+    async def hlc_timer(self):
+        try:
+            await asyncio.sleep(15)
+            logger.debug("15s passed since HLC communication established.")
+
+
+        except asyncio.CancelledError:
+            logger.debug("HLC timer was cancelled before completion.")
+
     async def track_hlc_connection(self):
         while True:
             try:
-                # No Communication type determined yet
-                if self.slac_handler.level_communication == COMMUNICATION_NONE:  # SLAC not determined yet
-                    if self.cp_state.present[0] == "B":  # Car plugged
-                        logger.debug("STARTING SLAC HANDLING")
-                        await self.slac_handler.handling(self.basicCharging)  
-                
-                else:
-                    if self.cp_state.present[0] == 'A':  # Car unplugged and SLAC not reset yet
-                        logger.debug("RESETTING SLAC PARAMETERS AFTER UNPLUG")
-                        await self.reset_hlc()
-                        
-                await asyncio.sleep(0.1)
+                if self.slac_handler.level_communication == COMMUNICATION_UNDEFINED:        # No Communication type determined yet
+                    if self.cp_state.present[0] == 'B':                                     # Car plugged 
+                        if self.slac_handler_task == None or self.slac_handler_task.done(): # if SLAC not done yet, or not started
+                            self.slac_handler_task = asyncio.create_task(self.slac_handler.handling(self.basicCharging))
+
+
+                else: # Communication type determined or being determined
+                    if self.cp_state.present[0] == 'A': # Car unplugged
+                        logger.debug("Reseting hlc parameters after unplug")
+                        await self.reset_hlc() # Reset hlc parameters
+
+
+
+
+                # if not self.hlc_timer_task or self.hlc_timer_task.done():
+                #     self.hlc_timer_task = asyncio.create_task(self.hlc_timer())
+
+                await asyncio.sleep(1)
             except Exception as e:
                 logger.error(f"hlc error: {e}")
+
+
+
 
     async def reset_hlc(self):
         try:
             logger.info("Reseting SLAC values")
             self.slac_handler.slac_running_session.reset()   # Reset slac session
-            self.slac_handler.level_communication = COMMUNICATION_NONE # Session finished, communication level defined as 'undetermined' for next session
+            self.slac_handler.level_communication = COMMUNICATION_UNDEFINED # Session finished, communication level defined as 'undetermined' for next session
             self.slac_handler.slac_attempt = 0 # Restart slac attempt counter
             self.basicCharging.charge_mode = ChargeMode.DISABLED # Make sure charger is in stop mode
             self.basicCharging.hlc_charging = 0 # Deactivate hlc charging 
+            self.hlc_timer_task = None
+
 
             # #close iso15118 module session, ver isto melhor depois
             # if self.secc_handler.tcp_server_handler:

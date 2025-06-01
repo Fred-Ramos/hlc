@@ -35,7 +35,8 @@ from pyslac.enums import (
     STATE_UNMATCHED,
     COMMUNICATION_HLC,
     COMMUNICATION_LLC,
-    COMMUNICATION_NONE,
+    COMMUNICATION_UNDEFINED,
+    COMMUNICATION_DETERMINING,
     FramesSizes,
     Timers,
 )
@@ -47,9 +48,9 @@ class Slac_Handler(SlacSessionController):
 
     def __init__(self, evse_id):
         super().__init__() #calls parent's classes initialization
-        self.level_communication = -1 #Communication Level starts undefined
-        self.max_slac_attempts = 1 + int(os.getenv("MAX_SLAC_RETRY_TIMES", str(C_SEQU_RETRY_TIMES))) # 1 attempt + retries
-        self.slac_attempt = 0 # no attempt yet
+        self.level_communication = COMMUNICATION_UNDEFINED #Communication Level starts undefined
+        self.max_slac_retries = int(os.getenv("MAX_SLAC_RETRY_TIMES", str(C_SEQU_RETRY_TIMES)))
+        self.max_slac_attempts = 1 + self.max_slac_retries # 1 initial attempt + retries
         self.evse_id = evse_id
 
         hlc_network_interface: str = os.getenv("NETWORK_INTERFACE")
@@ -57,46 +58,55 @@ class Slac_Handler(SlacSessionController):
             self.slac_running_session = SlacEvseSession(self.evse_id, hlc_network_interface)
         except (OSError, TimeoutError, ValueError) as e:
             logger.error(f"PLC chip initialization failed for interface {hlc_network_interface} \n")
-            return        
+            raise(e)        
     
     async def handling(self, cp_controller: BasicChargingStruct): #maybe enters session_handling_hlc
+        logger.debug("Starting slac handling...")
         try:
-            if self.slac_running_session.state == STATE_UNMATCHED: #not matched and HLC not tried yet
-                if not cp_controller.hlc_charging:
-                    logger.debug("PLACING PWM INTO 5% DutyCycle")
-                    cp_controller.hlc_charging = 1 # enable hlc charging in basiccharging module, 5% pwm
-                    await asyncio.sleep(0.1) #wait to make sure routine triggers
-                    await self.slac_running_session.evse_set_key() #set SLAC key, it wasnt set yet
-                    return
-                elif cp_controller.hlc_charging: # if hlc_charging enabled in basic charging
-                    if self.slac_attempt < self.max_slac_attempts: #allow 5% dutycycle for HLC communication, when in state B, C or D || 1st atempt + 3 retries=4atempts
-                        logger.debug("PWM already 5% DutyCycle")
-                        #implement slac message
-                        self.slac_attempt+=1
-                        logger.debug(f"SLAC Attempt number {self.slac_attempt}")
-                        self.level_communication = await self.process_cp_state(self.slac_running_session, cp_controller.committed_state)
-                        if self.level_communication == COMMUNICATION_NONE: #if HLC failed, go to F state for SLAC_E_F_TIMEOUT time
-                            logger.debug("SLAC Entering T_STEP_EF")
-                            cp_controller.force_F = 1 #force state F
-                            await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
-                            if self.slac_attempt == self.max_slac_attempts: # if this was the last retry, disable hlc charging and resume LLC communication
-                                logger.debug("PEV-EVSE MATCHED Failed: No more retries possible; Resuming LLC Charging")
-                                cp_controller.hlc_charging = 0 # disable hlc charging
-                                self.level_communication = COMMUNICATION_LLC #Will atempt basic charging (using LLC)
+            while self.level_communication not in (COMMUNICATION_HLC, COMMUNICATION_LLC):
+                if self.level_communication == COMMUNICATION_UNDEFINED:
+                    self.level_communication = COMMUNICATION_DETERMINING
 
-                            logger.debug("SLAC EXITING T_STEP_EF")
-                            cp_controller.force_F = 0 #leave state F
+                if self.slac_running_session.state != STATE_MATCHED: # not matched and HLC not tried yet
 
-                else:
-                    raise Exception(
-                        f"UNDEFINED SLAC HANDLING BEHAVIOUR."
-                        f"Committed State: {cp_controller.committed_state}, "
-                        f"Charge Mode: {cp_controller.charge_mode}",
-                        f"HLC charging: {cp_controller.hlc_charging}"
-                    )
-            else:
-                raise Exception("Slac Handling running while state not unmatched")
+                    if not cp_controller.hlc_charging:
+                        logger.debug("PLACING PWM INTO 5% DutyCycle")
+                        cp_controller.hlc_charging = 1 # enable hlc charging in basiccharging module, 5% pwm
+                        await self.slac_running_session.evse_set_key() #set SLAC key, it wasnt set yet
 
+                    elif cp_controller.hlc_charging: # if hlc_charging enabled in basic charging
+                        for slac_attempt in range(0, self.max_slac_attempts):  #allow 5% dutycycle for HLC communication, when in state B, C or D || 1st atempt + 3 retries=4atempts
+                            logger.debug(f"SLAC Attempt number {slac_attempt}")
+                            await self.process_cp_state(self.slac_running_session, cp_controller.committed_state) # try slac matching
+
+                            if self.slac_running_session.state == STATE_MATCHED:
+                                self.level_communication = COMMUNICATION_HLC
+                                break
+                            
+                            elif self.slac_running_session.state == STATE_UNMATCHED: #if SLAC failed, go to F state for SLAC_E_F_TIMEOUT time
+                                logger.debug("SLAC entering T_STEP_EF")
+                                cp_controller.force_F = 1 #force state F
+                                await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
+
+                                if slac_attempt == self.max_slac_retries: # if this is the last retry, disable hlc charging and resume LLC communication
+                                    logger.debug("PEV-EVSE MATCHED Failed: No more retries possible; Resuming LLC Charging")
+                                    cp_controller.hlc_charging = 0 # disable hlc charging
+                                    self.level_communication = COMMUNICATION_LLC # force llc communication, will atempt basic charging (using LLC)
+                                    
+                                cp_controller.force_F = 0 #leave state F
+                                while cp_controller.committed_state == "F": # Make sure cp leaves state F before proceeding with the slac handling
+                                    await asyncio.sleep(0.1)
+                                logger.debug("SLAC exited T_STEP_EF")
+
+                            else:
+                                raise Exception(
+                                        f"UNDEFINED SLAC HANDLING BEHAVIOUR."
+                                        f"Committed State: {cp_controller.committed_state}, "
+                                        f"Charge Mode: {cp_controller.charge_mode}",
+                                        f"HLC charging: {cp_controller.hlc_charging}",
+                                        f"Session State: {self.slac_running_session.state}"
+                                    )   
+                asyncio.sleep(0.1) # loop sleep
         except Exception as e:
             logger.error(e)
 
