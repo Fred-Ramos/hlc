@@ -9,9 +9,9 @@ from evse.iec61851 import IEC61851_Handler
 from evse.hlc.slac_handler import Slac_Handler
 
 from pyslac.enums import (
-    COMMUNICATION_HLC,
+    COMMUNICATION_HLC_READY,
     COMMUNICATION_LLC,
-    COMMUNICATION_DETERMINING)
+    COMMUNICATION_HLC)
 
 ###################################################### Logs ##########################################################################################################################
 import logging
@@ -177,10 +177,12 @@ from iso15118.shared.states import State
 
 from iso15118.shared.settings import set_pki_protocol
 
+from .iso15118_handler import ISO15118_Handler
 ##################################################################################################################################################################################################################
 class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from Ecog-io
     #======================== ISO Specific Variables =====================#
     slac_handler: Slac_Handler #Slac handler that will process all slac operations (made taking into account Ecog-io example)
+    controller: ISO15118_Handler
     #============================ Class Functions ==========================#
     def __init__(self):
         try:
@@ -201,6 +203,20 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
             logger.error(e)
             exit(1)
 
+    async def set_comm_status(self, status: bool = True):
+        # [V2G2-716]
+        try:
+            logger.debug(f"Setting comm status: {status}")
+            self.controller.secc_comm_status = status
+        except Exception as e:
+            logger.error(f"Exception: {e}")
+
+    async def get_comm_status(self):
+        try:
+            logger.debug(f"Getting comm status")
+            return self.controller.secc_comm_status
+        except Exception as e:
+            logger.error(f"Exception: {e}")
 
     ##########################################ISO EXPERIMENTAL#####################################################
     # From now on there are the addition of the methods of the ISO15118 module by EcoG-io                         #
@@ -1101,6 +1117,39 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
             logger.info(f"Ignoring EXI decoding of a {type(cert_install_req)} message.")
             return ""
 
+    # ISO FUNCTION
+    async def update_data_link(self, action: SessionStopAction) -> None:
+        """
+        Overrides EVSEControllerInterface.update_data_link().
+        """
+        logger.info(f"Updating data link: {action}")
+        pass
+
+    # ISO FUNCTION
+    async def session_ended(self, current_state: str, reason: str):
+        """
+        Reports the state and reason where the session ended.
+
+        @param current_state: The current SDP/SAP/DIN/ISO15118-2/ISO15118-20 state.
+        @param reason: Reason for ending the session.
+        @param last_message: The last message that was either sent/received.
+        """
+        logger.info(f"Session ended in {current_state} ({reason}).")
+
+    # ISO FUNCTION
+    async def send_display_params(self):
+        """
+        Share display params with CS.
+        """
+        logger.info("Send display params to CS.")
+
+    # ISO FUNCTION
+    async def send_rated_limits(self):
+        """
+        Overrides EVSEControllerInterface.send_rated_limits
+        """
+        logger.info("Send rated limits to CS.")
+        
 # Describes Our Station parameters and limits
 ############################################################### get_evse_context / ver melhor isto depois, para substituir pelas nossas variaveis mesmo
 def get_evse_context():
