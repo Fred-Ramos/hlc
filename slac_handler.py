@@ -33,7 +33,7 @@ from pyslac.enums import (
     STATE_MATCHED,
     STATE_MATCHING,
     STATE_UNMATCHED,
-    COMMUNICATION_HLC,
+    COMMUNICATION_HLC_READY,
     COMMUNICATION_LLC,
     COMMUNICATION_UNDEFINED,
     COMMUNICATION_DETERMINING,
@@ -60,12 +60,32 @@ class Slac_Handler(SlacSessionController):
             logger.error(f"PLC chip initialization failed for interface {hlc_network_interface} \n")
             raise(e)        
     
-    async def handling(self, cp_controller: BasicChargingStruct): #maybe enters session_handling_hlc
+    async def reinit_cp(self, cp_controller: BasicChargingStruct, fallback: bool = False):
+        if cp_controller.committed_state[0] != "A":      # Go through T_STEP_EF only if still plugged
+            logger.debug("SLAC entering T_STEP_EF")
+            cp_controller.force_F = 1 #force state F
+            await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
+
+            if fallback: # disable hlc charging and resume LLC communication
+                logger.debug("Fallback to LLC Communication")
+                cp_controller.hlc_charging = 0 # disable hlc charging
+                self.level_communication = COMMUNICATION_LLC # force llc communication, will atempt basic charging (using LLC)
+
+        else:
+            cp_controller.hlc_charging = 0 # disable hlc charging
+            self.level_communication = COMMUNICATION_UNDEFINED # force llc communication, will atempt basic charging (using LLC)
+        
+        if cp_controller.force_F == 1: # Leave state F
+            cp_controller.force_F = 0 
+            while cp_controller.committed_state == "F": # Make sure cp leaves state F before proceeding with the slac handling
+                await asyncio.sleep(0.1)
+            logger.debug("SLAC exited T_STEP_EF")
+    
+    async def handling(self, cp_controller: BasicChargingStruct):
         logger.debug("Starting slac handling...")
         try:
-            while self.level_communication not in (COMMUNICATION_HLC, COMMUNICATION_LLC):
-                if self.level_communication == COMMUNICATION_UNDEFINED:
-                    self.level_communication = COMMUNICATION_DETERMINING
+            self.level_communication = COMMUNICATION_DETERMINING
+            while self.level_communication == COMMUNICATION_DETERMINING:
 
                 if self.slac_running_session.state != STATE_MATCHED: # not matched and HLC not tried yet
 
@@ -80,23 +100,16 @@ class Slac_Handler(SlacSessionController):
                             await self.process_cp_state(self.slac_running_session, cp_controller.committed_state) # try slac matching
 
                             if self.slac_running_session.state == STATE_MATCHED:
-                                self.level_communication = COMMUNICATION_HLC
+                                self.level_communication = COMMUNICATION_HLC_READY
                                 break
                             
                             elif self.slac_running_session.state == STATE_UNMATCHED: #if SLAC failed, go to F state for SLAC_E_F_TIMEOUT time
-                                logger.debug("SLAC entering T_STEP_EF")
-                                cp_controller.force_F = 1 #force state F
-                                await asyncio.sleep(Timers.SLAC_E_F_TIMEOUT)
-
+                                fallback=False
                                 if slac_attempt == self.max_slac_retries: # if this is the last retry, disable hlc charging and resume LLC communication
-                                    logger.debug("PEV-EVSE MATCHED Failed: No more retries possible; Resuming LLC Charging")
-                                    cp_controller.hlc_charging = 0 # disable hlc charging
-                                    self.level_communication = COMMUNICATION_LLC # force llc communication, will atempt basic charging (using LLC)
+                                    logger.debug("PEV-EVSE MATCHED Failed: No more retries possible")
+                                    fallback=True
                                     
-                                cp_controller.force_F = 0 #leave state F
-                                while cp_controller.committed_state == "F": # Make sure cp leaves state F before proceeding with the slac handling
-                                    await asyncio.sleep(0.1)
-                                logger.debug("SLAC exited T_STEP_EF")
+                                await self.reinit_cp(cp_controller=cp_controller, fallback=fallback)
 
                             else:
                                 raise Exception(
@@ -106,9 +119,12 @@ class Slac_Handler(SlacSessionController):
                                         f"HLC charging: {cp_controller.hlc_charging}",
                                         f"Session State: {self.slac_running_session.state}"
                                     )   
-                asyncio.sleep(0.1) # loop sleep
+                await asyncio.sleep(0.3) # loop sleep
         except Exception as e:
             logger.error(e)
+
+        except asyncio.CancelledError:
+            logger.warning("Caught CancelledError in main")
 
 """
 NOTAS
