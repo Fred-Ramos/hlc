@@ -188,7 +188,7 @@ from iso15118.shared.exificient_exi_codec import ExificientEXICodec
 
 from iso15118.shared.utils import cancel_task
 
-SECC_CommSetup_Timeout = 18 # [V2G2-605]
+SECC_CommSetup_Timeout = 22 # Actual is 18 [V2G2-605]
 
 ##################################################################################################################################################################################################################
 class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
@@ -207,8 +207,8 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
             self.slac_handler = Slac_Handler(self.evse_id)
             self.slac_handler_task = None
 
-            self.secc_comm_status_timer_task = None
-            self.secc_comm_status = None
+            self.hlc_comm_status_timer_task = None
+            self.hlc_comm_status = None
             logger.info("########################################### Finished ISO Handler initialization ###########################################")
         except Exception as e:
             logger.error(e)
@@ -222,17 +222,18 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
                         await cancel_task(self.slac_handler_task)
                     await self.reset_hlc() # Reset hlc parameters
 
-    async def comm_setup_timer(self):
+    async def hlc_comm_setup_timer(self):
         """ 
         [V2G2-716] The SECC shall stop waiting for SessionSetupReq and stop monitoring the V2G_SECC_CommunicationSetup_Timer
         when V2G_SECC_CommunicationSetup_Timer is equal or larger than V2G_SECC_CommunicationSetup_Performance_Time
         and no SessionSetupRes message was sent. It shall then apply [V2G2-034].
         """
         try:
-            logger.debug(f"Monitoring V2G Communication Setup Time; initial comm_status: {self.secc_comm_status}")
+            logger.debug(f"Monitoring V2G Communication Setup Time; initial comm_status: {self.hlc_comm_status}")
             await asyncio.sleep(SECC_CommSetup_Timeout)
-            logger.warning(f"V2G SECC Communication Setup Timeout; Resuming LLC Communication")
-            self.secc_comm_status = False
+            if self.hlc_comm_status == None:
+                logger.warning(f"V2G SECC Communication Setup Timeout; Resuming LLC Communication")
+                self.hlc_comm_status = False
 
         except asyncio.CancelledError:
             logger.debug("HLC timer was cancelled before completion.")
@@ -242,16 +243,16 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
         This method might also be used by the EVSE to terminate HLC communication and fallback to LLC
         """
         try:
-            if self.secc_comm_status == False and self.slac_handler.level_communication != COMMUNICATION_LLC:
+            if self.hlc_comm_status == False and self.slac_handler.level_communication != COMMUNICATION_LLC:
                 await self.reset_hlc(fallback = True)
                 await self.slac_handler.reinit_cp(cp_controller=self.basicCharging, fallback=True)
 
-            elif self.secc_comm_status == True:
+            elif self.hlc_comm_status == True:
                 if self.slac_handler.level_communication != COMMUNICATION_HLC:
                     self.slac_handler.level_communication = COMMUNICATION_HLC # definitive HLC communication
 
-                if self.secc_comm_status_timer_task:
-                    await cancel_task(self.secc_comm_status_timer_task)
+                if self.hlc_comm_status_timer_task:
+                    await cancel_task(self.hlc_comm_status_timer_task)
 
         except Exception as e:
             logger.error(f"Exception in communication check: {e}")
@@ -266,8 +267,8 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
                             self.slac_handler_task = asyncio.create_task(self.slac_handler.handling(self.basicCharging))
 
                 elif self.slac_handler.level_communication == COMMUNICATION_HLC_READY:
-                    if self.secc_comm_status_timer_task == None or self.secc_comm_status_timer_task.done():
-                        self.secc_comm_status_timer_task = asyncio.create_task(self.comm_setup_timer())
+                    if self.hlc_comm_status_timer_task == None or self.hlc_comm_status_timer_task.done():
+                        self.hlc_comm_status_timer_task = asyncio.create_task(self.hlc_comm_setup_timer())
 
                 await self.hlc_check_unplug()
                 await self.hlc_check_comm()
@@ -282,15 +283,17 @@ class ISO15118_Handler(IEC61851_Handler): #EVSEControllerInterface from Ecog-io
             self.slac_handler.slac_attempt = 0 # Restart slac attempt counter
             self.basicCharging.charge_mode = ChargeMode.DISABLED # Make sure charger is in stop mode
             self.basicCharging.hlc_charging = 0 # Deactivate hlc charging 
-            self.secc_comm_status_timer_task = None
-
-            if fallback == True:
+            if self.hlc_comm_status_timer_task:
+                await cancel_task(self.hlc_comm_status_timer_task)
+            self.hlc_comm_status_timer_task = None
+            
+            if fallback == True and self.cp_state.present[0] != 'A':
                 self.slac_handler.level_communication = COMMUNICATION_LLC # Fallback to LLC Communication
-                self.secc_comm_status = False
+                self.hlc_comm_status = False
             else:
                 self.slac_handler.level_communication = COMMUNICATION_UNDEFINED # Session finished, communication level defined as 'undetermined' for next session
-                self.secc_comm_status = None
-
+                self.hlc_comm_status = None
+            
         except Exception as e:
             logger.error(e)
 
