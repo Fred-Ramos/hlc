@@ -207,14 +207,14 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         # [V2G2-716]
         try:
             logger.debug(f"Setting comm status: {status}")
-            self.controller.secc_comm_status = status
+            self.controller.hlc_comm_status = status
         except Exception as e:
             logger.error(f"Exception: {e}")
 
     async def get_comm_status(self):
         try:
             logger.debug(f"Getting comm status")
-            return self.controller.secc_comm_status
+            return self.controller.hlc_comm_status
         except Exception as e:
             logger.error(f"Exception: {e}")
 
@@ -561,7 +561,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         return service_list
 
     def is_eim_authorized(self) -> bool:
-        """Overrides EVSEControllerInterface.is_eim_authorized()."""
+        """Overrides EVSEControllerInterface.is_eim_authorized()."""  # the .env variable overwrites this function
         return False
 
     async def is_authorized(
@@ -572,6 +572,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         hash_data: Optional[List[Dict[str, str]]] = None,
     ) -> AuthorizationResponse:
         """Overrides EVSEControllerInterface.is_authorized()."""
+        logger.debug("Checking authorization...")
         protocol = self.get_selected_protocol()
         response_code: Optional[
             Union[ResponseCodeDINSPEC, ResponseCodeV2, ResponseCodeV20]
@@ -582,6 +583,11 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
             response_code = ResponseCodeV20.OK
         else:
             response_code = ResponseCodeV2.OK
+
+        logger.debug(
+            f"Authorization status: {AuthorizationStatus.ACCEPTED}, "
+            f"Response code: {response_code}"
+        )
 
         return AuthorizationResponse(
             authorization_status=AuthorizationStatus.ACCEPTED,
