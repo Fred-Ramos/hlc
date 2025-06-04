@@ -178,11 +178,10 @@ from iso15118.shared.states import State
 from iso15118.shared.settings import set_pki_protocol
 
 from .iso15118_handler import ISO15118_Handler
+from evse.iec61851.basic_charging.build_basic_charging import ChargeMode
+from evse.ocpp_constructor import OCPP_Constructor
 ##################################################################################################################################################################################################################
 class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from Ecog-io
-    #======================== ISO Specific Variables =====================#
-    slac_handler: Slac_Handler #Slac handler that will process all slac operations (made taking into account Ecog-io example)
-    controller: ISO15118_Handler
     #============================ Class Functions ==========================#
     def __init__(self):
         try:
@@ -191,9 +190,14 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
 
             self.evse_id = os.getenv("EVSE_ID")
             self.meter_id = 'INESCTEC_AC_1ph_meter'
-
-            self.controller = None # place holder for controller
-
+            
+            # Placeholders
+            self.controller: ISO15118_Handler 
+            self.ocpp: OCPP_Constructor 
+            self.slac_handler: Slac_Handler #Slac handler that will process all slac operations (made taking into account Ecog-io example)
+            self.env_authentication_needed: bool
+            self.authentication_needed: bool
+            self.user_authenticated: bool
             #===============================ISO15118 MODULE initialization================================#
             logger.info("Starting (INESCTEC Modified) EcoG-io's EVSEController")
             self.evse_data_context = get_evse_context()
@@ -563,36 +567,6 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
     def is_eim_authorized(self) -> bool:
         """Overrides EVSEControllerInterface.is_eim_authorized()."""  # the .env variable overwrites this function
         return False
-
-    async def is_authorized(
-        self,
-        id_token: Optional[str] = None,
-        id_token_type: Optional[AuthorizationTokenType] = None,
-        certificate_chain: Optional[bytes] = None,
-        hash_data: Optional[List[Dict[str, str]]] = None,
-    ) -> AuthorizationResponse:
-        """Overrides EVSEControllerInterface.is_authorized()."""
-        logger.debug("Checking authorization...")
-        protocol = self.get_selected_protocol()
-        response_code: Optional[
-            Union[ResponseCodeDINSPEC, ResponseCodeV2, ResponseCodeV20]
-        ] = None
-        if protocol == Protocol.DIN_SPEC_70121:
-            response_code = ResponseCodeDINSPEC.OK
-        elif protocol == Protocol.ISO_15118_20_COMMON_MESSAGES:
-            response_code = ResponseCodeV20.OK
-        else:
-            response_code = ResponseCodeV2.OK
-
-        logger.debug(
-            f"Authorization status: {AuthorizationStatus.ACCEPTED}, "
-            f"Response code: {response_code}"
-        )
-
-        return AuthorizationResponse(
-            authorization_status=AuthorizationStatus.ACCEPTED,
-            certificate_response_status=response_code,
-        )
 
     async def get_sa_schedule_list_dinspec(
         self, max_schedule_entries: Optional[int], departure_time: int = 0
@@ -1122,7 +1096,65 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         else:
             logger.info(f"Ignoring EXI decoding of a {type(cert_install_req)} message.")
             return ""
+    
+    async def is_authorized(
+        self,
+        id_token: Optional[str] = None,
+        id_token_type: Optional[AuthorizationTokenType] = None,
+        certificate_chain: Optional[bytes] = None,
+        hash_data: Optional[List[Dict[str, str]]] = None,
+    ) -> AuthorizationResponse:
+        """Overrides EVSEControllerInterface.is_authorized()."""
+        logger.debug("Checking authorization...")
+        protocol = self.get_selected_protocol()
+        response_code: Optional[
+            Union[ResponseCodeDINSPEC, ResponseCodeV2, ResponseCodeV20]
+        ] = None
+        # ============================ Response Code ================================#
+        if protocol == Protocol.DIN_SPEC_70121:
+            response_code = ResponseCodeDINSPEC.OK
+            
+        elif protocol == Protocol.ISO_15118_20_COMMON_MESSAGES:
+            response_code = ResponseCodeV20.OK
+        else:
+            response_code = ResponseCodeV2.OK
+        
+        # ============================ Authorization ================================#
+        #if communication with CSMS possible
+        if self.ocpp: #if communication with CSMS possible
+            if self.env_authentication_needed:
+                if self.user_authenticated: # given via ocpp
+                    auth_status=AuthorizationStatus.ACCEPTED
+                else:
+                    auth_status=AuthorizationStatus.ONGOING
+            else:
+                auth_status=AuthorizationStatus.ACCEPTED
 
+        #if no communication with CSMS possible, for now ready_to_charge is allways true 
+        else:
+            auth_status=AuthorizationStatus.ACCEPTED
+        
+        logger.debug(
+            f"Authorization status: {auth_status}, "
+            f"Response code: {response_code}"
+        )
+
+        if auth_status == AuthorizationStatus.ACCEPTED:
+            self.controller.basicCharging.charge_mode = ChargeMode.READY
+        else:
+            self.controller.basicCharging.charge_mode = ChargeMode.DISABLED
+
+        return AuthorizationResponse(
+            authorization_status=auth_status,
+            certificate_response_status=response_code,
+        )
+    
+    def ready_to_charge(self) -> bool:
+        """
+        Overrides EVSEControllerInterface.ready_to_charge().
+        """
+        return True
+    
     # ISO FUNCTION
     async def update_data_link(self, action: SessionStopAction) -> None:
         """
