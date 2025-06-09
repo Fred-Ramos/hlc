@@ -1136,7 +1136,8 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         
         logger.debug(
             f"Authorization status: {auth_status}, "
-            f"Response code: {response_code}"
+            f"Response code: {response_code}, "
+            f"DEBUGG USER AUTHENTICATED_ {self.user_authenticated}"
         )
 
         if auth_status == AuthorizationStatus.ACCEPTED:
