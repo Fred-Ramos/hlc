@@ -23,6 +23,7 @@ fi
 HLC_DIR="$PROJECT_PATH/charger_ocpp/evse/hlc"
 CAPTURE_DIR="$HLC_DIR/captures"
 mkdir -p "$CAPTURE_DIR"
+sudo chmod 775 "$CAPTURE_DIR"
 
 # File rotation size in KB (100MB)
 FILESIZE_LIMIT_KB=102400
