@@ -652,7 +652,7 @@ class EVSE_ISO_Adapter(EVSEControllerInterface): #EVSEControllerInterface from E
         #number of schedules we want to do
         n_wanted_entries = 20 #max number of sascheduletuple elements without GIVING EOF PROBLEMS
 
-        power_levels = [[7, 5, 3], [3, 4, 3], [2, 3, 4]]
+        power_levels = [[7, 6, 5], [3, 4, 3], [2, 3, 4]]
         price_levels = [[1, 2, 3], [1, 2, 3], [1, 2, 3]]
         n_typed_schedules = len(power_levels)
         n_wanted_schedules = n_typed_schedules #we want the same number of schedules
