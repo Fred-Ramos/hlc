@@ -31,4 +31,4 @@ FILESIZE_LIMIT_KB=102400
 FILE_PREFIX="$CAPTURE_DIR/capture_$(date +%Y-%m-%d_%H-%M-%S)"
 
 # Start tcpdump with file size-based rotation
-tcpdump -i "$NETWORK_INTERFACE" -s 0 -C "$FILESIZE_LIMIT_KB" -w "${FILE_PREFIX}.pcap"
+tcpdump -i "$NETWORK_INTERFACE" -s 0 -C "$FILESIZE_LIMIT_KB" -W 1 -w "${FILE_PREFIX}.pcap"
